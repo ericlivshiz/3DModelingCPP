@@ -15,7 +15,7 @@ int main()
     mat4x4 matProj;
     Math math;
 
-    mesh.loadFromObjFile("Objects/VideoShip.obj");
+    mesh.loadFromObjFile("Objects/axis.obj");
 
     // Projection Matrix
     matProj = math.Matrix_MakeProjection(90.0f, (float)ScreenDimensions.y / (float)ScreenDimensions.x, 0.1f, 1000.0f);
@@ -26,32 +26,91 @@ int main()
     matTrans = math.Matrix_MakeTranslation(0.0f, 0.0f, 5.0f);
     
     vec3D vCamera;
+    vec3D vLookDir;
+
+
+    float fYaw = 0;
+
 
     while (window.isOpen())
     {
         sf::Event event;
+
+        vec3D vForward = math.Vector_Mul(vLookDir, 0.2f);
+
         while (window.pollEvent(event))
         {
             if (event.type == sf::Event::Closed)
                 window.close();
+
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up))
+            {
+                vCamera.y += 0.2f;
+            }
+
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down))
+            {
+                vCamera.y -= 0.2f;
+            }
+
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right))
+            {
+                fYaw += 0.1f;
+
+            }
+
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left))
+            {
+                fYaw -= 0.1f;
+            }
+
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::D))
+            {
+                vCamera.x -= 0.2f;
+            }
+            
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::A))
+            {
+                vCamera.x += 0.2f;
+            }
+
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::W))
+            {
+                vCamera = math.Vector_Add(vCamera, vForward);
+            }
+
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::S))
+            {
+                vCamera = math.Vector_Sub(vCamera, vForward);
+            }
         }
 
         window.clear();
 
+        vec3D vUp = { 0, 1, 0 };
+        vec3D vTarget = { 0,0,1 };
+        mat4x4 matCameraRot = math.Matrix_MakeRotationY(fYaw);
+        vLookDir = math.Matrix_MultiplyVector(matCameraRot, vTarget);
+        vTarget = math.Vector_Add(vCamera, vLookDir);
+
+        mat4x4 matCamera = math.Matrix_PointAt(vCamera, vTarget, vUp);
+
+        // Make view matrix from camera
+        mat4x4 matView = math.Matrix_QuickInverse(matCamera);
+
         std::vector<Triangle> vecTrianglesToRaster;
+
+        // fTheta += .01f * 0.0003f;
+        matRotZ = math.Matrix_MakeRotationZ(fTheta);
+        matRotX = math.Matrix_MakeRotationX(fTheta);
+
+        matWorld = math.Matrix_MakeIdentity();
+        matWorld = math.Matrix_MultiplyMatrix(matRotZ, matRotX);
+        matWorld = math.Matrix_MultiplyMatrix(matWorld, matTrans);
 
         for (auto tri : mesh.tris)
         {
-
-            fTheta += .01f * 0.0003f;
-            matRotZ = math.Matrix_MakeRotationZ(fTheta);
-            matRotX = math.Matrix_MakeRotationX(fTheta);
-
-            matWorld = math.Matrix_MakeIdentity();
-            matWorld = math.Matrix_MultiplyMatrix(matRotZ, matRotX);
-            matWorld = math.Matrix_MultiplyMatrix(matWorld, matTrans);
-
-            Triangle triProjected, triTransformed;
+            Triangle triProjected, triTransformed, triViewed;
 
             // World Matrix Transform
             triTransformed.t[0] = math.Matrix_MultiplyVector(matWorld, tri.t[0]);
@@ -88,37 +147,52 @@ int main()
 
                 vec3D vOffsetView = { 1,1,0 };
 
-                // Project triangles from 3D --> 2D
-                triProjected.t[0] = math.Matrix_MultiplyVector(matProj, triTransformed.t[0]);
-                triProjected.t[1] = math.Matrix_MultiplyVector(matProj, triTransformed.t[1]);
-                triProjected.t[2] = math.Matrix_MultiplyVector(matProj, triTransformed.t[2]);
+                // Convert World Space --> View Space
+                triViewed.t[0] = math.Matrix_MultiplyVector(matView, triTransformed.t[0]);
+                triViewed.t[1] = math.Matrix_MultiplyVector(matView, triTransformed.t[1]);
+                triViewed.t[2] = math.Matrix_MultiplyVector(matView, triTransformed.t[2]);
 
-                // Scale into view
-                triProjected.t[0] = math.Vector_Div(triProjected.t[0], triProjected.t[0].w);
-                triProjected.t[1] = math.Vector_Div(triProjected.t[1], triProjected.t[1].w);
-                triProjected.t[2] = math.Vector_Div(triProjected.t[2], triProjected.t[2].w);
+                // Clip Viewed Triangle against near plane, this could form two additional triangles
+                int nClippedTriangles = 0;
+                Triangle clipped[2];
+                nClippedTriangles = math.Triangle_ClipAgainstPlane(
+                    { 0.0f, 0.0f, 0.1f }, { 0.0f, 0.0f, 1.0f }, triViewed, clipped[0], clipped[1]);
 
-                // X/Y are inverted so put them back
-                triProjected.t[0].x *= -1.0f;
-                triProjected.t[1].x *= -1.0f;
-                triProjected.t[2].x *= -1.0f;
-                triProjected.t[0].y *= -1.0f;
-                triProjected.t[1].y *= -1.0f;
-                triProjected.t[2].y *= -1.0f;
+                for (int n = 0; n < nClippedTriangles; n++)
+                {
 
-                // Offset verts into visible normalised space
-                triProjected.t[0] = math.Vector_Add(triProjected.t[0], vOffsetView);
-                triProjected.t[1] = math.Vector_Add(triProjected.t[1], vOffsetView);
-                triProjected.t[2] = math.Vector_Add(triProjected.t[2], vOffsetView);
-                triProjected.t[0].x *= 0.5f * ScreenDimensions.x;
-                triProjected.t[0].y *= 0.5f * ScreenDimensions.y;
-                triProjected.t[1].x *= 0.5f * ScreenDimensions.x;
-                triProjected.t[1].y *= 0.5f * ScreenDimensions.y;
-                triProjected.t[2].x *= 0.5f * ScreenDimensions.x;
-                triProjected.t[2].y *= 0.5f * ScreenDimensions.y;
+                    // Project triangles from 3D --> 2D
+                    triProjected.t[0] = math.Matrix_MultiplyVector(matProj, clipped[n].t[0]);
+                    triProjected.t[1] = math.Matrix_MultiplyVector(matProj, clipped[n].t[1]);
+                    triProjected.t[2] = math.Matrix_MultiplyVector(matProj, clipped[n].t[2]);
 
-                // Store triangle for sorting
-                vecTrianglesToRaster.push_back(triProjected);
+                    // Scale into view
+                    triProjected.t[0] = math.Vector_Div(triProjected.t[0], triProjected.t[0].w);
+                    triProjected.t[1] = math.Vector_Div(triProjected.t[1], triProjected.t[1].w);
+                    triProjected.t[2] = math.Vector_Div(triProjected.t[2], triProjected.t[2].w);
+
+                    // X/Y are inverted so put them back
+                    triProjected.t[0].x *= -1.0f;
+                    triProjected.t[1].x *= -1.0f;
+                    triProjected.t[2].x *= -1.0f;
+                    triProjected.t[0].y *= -1.0f;
+                    triProjected.t[1].y *= -1.0f;
+                    triProjected.t[2].y *= -1.0f;
+
+                    // Offset verts into visible normalised space
+                    triProjected.t[0] = math.Vector_Add(triProjected.t[0], vOffsetView);
+                    triProjected.t[1] = math.Vector_Add(triProjected.t[1], vOffsetView);
+                    triProjected.t[2] = math.Vector_Add(triProjected.t[2], vOffsetView);
+                    triProjected.t[0].x *= 0.5f * ScreenDimensions.x;
+                    triProjected.t[0].y *= 0.5f * ScreenDimensions.y;
+                    triProjected.t[1].x *= 0.5f * ScreenDimensions.x;
+                    triProjected.t[1].y *= 0.5f * ScreenDimensions.y;
+                    triProjected.t[2].x *= 0.5f * ScreenDimensions.x;
+                    triProjected.t[2].y *= 0.5f * ScreenDimensions.y;
+
+                    // Store triangle for sorting
+                    vecTrianglesToRaster.push_back(triProjected);
+                }
             }
         }
 
@@ -130,7 +204,7 @@ int main()
                 return z1 > z2;
             });
 
-        sf::Color greyishColor = sf::Color(32, 128, 128);  // RGB values for a mid-grey color
+        sf::Color greyishColor = sf::Color(128, 128, 128);  // RGB values for a mid-grey color
 
         // Draw Triangles
         for (auto& triProjected : vecTrianglesToRaster)
