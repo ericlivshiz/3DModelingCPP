@@ -1,78 +1,31 @@
-#include <SFML/Graphics.hpp>
-#include <iostream>
+#include "../Objects/ObjectMgr.hpp"
+#include "../Util/Math.hpp"
 
-struct triangle {
-    sf::Vector3f t[3];
-};
+void populateMesh(Mesh& mesh);
 
-struct mesh {
-    std::vector<triangle> tris;
-};
+const sf::Vector2f ScreenDimensions = sf::Vector2f(1200.0f, 1000.0f);
 
-struct mat4x4 {
-    float m[4][4] = { 0 };
-};
-
-sf::Color getRandomColor();
-void MultiplyMatrixVector(sf::Vector3f& i, sf::Vector3f& o, mat4x4& m);
+sf::Color getColor(float& dp);
 
 int main()
 {
-    sf::Vector2f ScreenDimensions = sf::Vector2f(1200.0f, 1000.0f);
-    sf::RenderWindow window(sf::VideoMode(ScreenDimensions.x, ScreenDimensions.y), "SFML works!");
-    /*sf::CircleShape shape(100.f);
-    shape.setFillColor(sf::Color::Green);*/
-    mesh meshCube;
+    sf::RenderWindow window(sf::VideoMode(ScreenDimensions.x, ScreenDimensions.y), "3D Game Engine 1.3");
 
-    meshCube.tris = {
-        // SOUTH
-        {sf::Vector3f(0.0f, 0.0f, 0.0f),     sf::Vector3f(0.0f, 1.0f, 0.0f),     sf::Vector3f(1.0f, 1.0f, 0.0f)},
-        {sf::Vector3f(0.0f, 0.0f, 0.0f),     sf::Vector3f(1.0f, 1.0f, 0.0f),     sf::Vector3f(1.0f, 0.0f, 0.0f)},
+    Mesh mesh;
+    mat4x4 matProj;
+    Math math;
 
-        // EAST
-        {sf::Vector3f(1.0f, 0.0f, 0.0f),     sf::Vector3f(1.0f, 1.0f, 0.0f),     sf::Vector3f(1.0f, 1.0f, 1.0f)},
-        {sf::Vector3f(1.0f, 0.0f, 0.0f),     sf::Vector3f(1.0f, 1.0f, 1.0f),     sf::Vector3f(1.0f, 0.0f, 1.0f)},
-
-        // NORTH
-        {sf::Vector3f(1.0f, 0.0f, 1.0f),     sf::Vector3f(1.0f, 1.0f, 1.0f),     sf::Vector3f(0.0f, 1.0f, 1.0f)},
-        {sf::Vector3f(1.0f, 0.0f, 1.0f),     sf::Vector3f(0.0f, 1.0f, 1.0f),     sf::Vector3f(0.0f, 0.0f, 1.0f)},
-
-        //// WEST
-        {sf::Vector3f(0.0f, 0.0f, 1.0f),     sf::Vector3f(0.0f, 1.0f, 1.0f),     sf::Vector3f(0.0f, 1.0f, 0.0f)},
-        {sf::Vector3f(0.0f, 0.0f, 1.0f),     sf::Vector3f(0.0f, 1.0f, 0.0f),     sf::Vector3f(0.0f, 0.0f, 0.0f)},
-
-        //// TOP
-        {sf::Vector3f(0.0f, 1.0f, 0.0f),     sf::Vector3f(0.0f, 1.0f, 1.0f),     sf::Vector3f(1.0f, 1.0f, 1.0f)},
-        {sf::Vector3f(0.0f, 1.0f, 0.0f),     sf::Vector3f(1.0f, 1.0f, 1.0f),     sf::Vector3f(1.0f, 1.0f, 0.0f)},
-
-        //// BOTTOM
-        {sf::Vector3f(1.0f, 0.0f, 1.0f),     sf::Vector3f(0.0f, 0.0f, 1.0f),     sf::Vector3f(0.0f, 0.0f, 0.0f)},
-        {sf::Vector3f(1.0f, 0.0f, 1.0f),     sf::Vector3f(0.0f, 0.0f, 0.0f),     sf::Vector3f(1.0f, 0.0f, 0.0f)},
-
-
-    };
+    mesh.loadFromObjFile("Objects/VideoShip.obj");
 
     // Projection Matrix
-    float fNear = 0.1f;
-    float fFar = 1000.f;
-    float fFOV = 90.0f;
-    float fAspectRatio = ScreenDimensions.y / ScreenDimensions.x;
-    float fFOVRad = 1.0f / tanf(fFOV * 0.5f / 180.0f * 3.14159);
+    matProj = math.Matrix_MakeProjection(90.0f, (float)ScreenDimensions.y / (float)ScreenDimensions.x, 0.1f, 1000.0f);
 
-    mat4x4 matProj;
+    mat4x4 matWorld, matTrans, matRotZ, matRotX;
+    float fTheta = 0; 
 
-    matProj.m[0][0] = fAspectRatio * fFOVRad;
-    matProj.m[1][1] = fFOVRad;
-    matProj.m[2][2] = fFar / (fFar - fNear);
-    matProj.m[2][3] = (-fFar * fNear) / (fFar - fNear);
-    matProj.m[3][2] = 1.0f;
-    matProj.m[3][3] = 0.0f;
-
-    mat4x4 matRotZ, matRotX;
-    float fTheta = 0;
-
-
+    matTrans = math.Matrix_MakeTranslation(0.0f, 0.0f, 5.0f);
     
+    vec3D vCamera;
 
     while (window.isOpen())
     {
@@ -83,106 +36,128 @@ int main()
                 window.close();
         }
 
-
-
         window.clear();
 
-        for (auto tri : meshCube.tris)
+        std::vector<Triangle> vecTrianglesToRaster;
+
+        for (auto tri : mesh.tris)
+        {
+
+            fTheta += .01f * 0.0003f;
+            matRotZ = math.Matrix_MakeRotationZ(fTheta);
+            matRotX = math.Matrix_MakeRotationX(fTheta);
+
+            matWorld = math.Matrix_MakeIdentity();
+            matWorld = math.Matrix_MultiplyMatrix(matRotZ, matRotX);
+            matWorld = math.Matrix_MultiplyMatrix(matWorld, matTrans);
+
+            Triangle triProjected, triTransformed;
+
+            // World Matrix Transform
+            triTransformed.t[0] = math.Matrix_MultiplyVector(matWorld, tri.t[0]);
+            triTransformed.t[1] = math.Matrix_MultiplyVector(matWorld, tri.t[1]);
+            triTransformed.t[2] = math.Matrix_MultiplyVector(matWorld, tri.t[2]);
+
+            // Calc triangle normal
+            vec3D normal, line1, line2;
+
+            // Get lines either side of triangle
+            line1 = math.Vector_Sub(triTransformed.t[1], triTransformed.t[0]);
+            line2 = math.Vector_Sub(triTransformed.t[2], triTransformed.t[0]);
+
+            // Take cross product of lines to get normal to triangle surface
+            normal = math.Vector_CrossProduct(line1, line2);
+
+            // normalize normal :P
+            normal = math.Vector_Normalise(normal);
+
+            // normal = math.Vector_Mul(normal, -1);
+
+            // Get ray from triangle to camera
+            vec3D vCameraRay = math.Vector_Sub(triTransformed.t[0], vCamera);
+
+            if (math.Vector_DotProduct(normal, vCameraRay) < 0.0f)
+            {
+                // Illumination
+                vec3D lightDirection = { 0.0f, 1.0f, -1.0f };
+                lightDirection = math.Vector_Normalise(lightDirection);
+                lightDirection = math.Vector_Div(lightDirection, 1);
+
+                // How "aligned" are light direction and triangle surface normal?
+                float dp = std::max(0.1f, math.Vector_DotProduct(lightDirection, normal));
+
+                vec3D vOffsetView = { 1,1,0 };
+
+                // Project triangles from 3D --> 2D
+                triProjected.t[0] = math.Matrix_MultiplyVector(matProj, triTransformed.t[0]);
+                triProjected.t[1] = math.Matrix_MultiplyVector(matProj, triTransformed.t[1]);
+                triProjected.t[2] = math.Matrix_MultiplyVector(matProj, triTransformed.t[2]);
+
+                // Scale into view
+                triProjected.t[0] = math.Vector_Div(triProjected.t[0], triProjected.t[0].w);
+                triProjected.t[1] = math.Vector_Div(triProjected.t[1], triProjected.t[1].w);
+                triProjected.t[2] = math.Vector_Div(triProjected.t[2], triProjected.t[2].w);
+
+                // X/Y are inverted so put them back
+                triProjected.t[0].x *= -1.0f;
+                triProjected.t[1].x *= -1.0f;
+                triProjected.t[2].x *= -1.0f;
+                triProjected.t[0].y *= -1.0f;
+                triProjected.t[1].y *= -1.0f;
+                triProjected.t[2].y *= -1.0f;
+
+                // Offset verts into visible normalised space
+                triProjected.t[0] = math.Vector_Add(triProjected.t[0], vOffsetView);
+                triProjected.t[1] = math.Vector_Add(triProjected.t[1], vOffsetView);
+                triProjected.t[2] = math.Vector_Add(triProjected.t[2], vOffsetView);
+                triProjected.t[0].x *= 0.5f * ScreenDimensions.x;
+                triProjected.t[0].y *= 0.5f * ScreenDimensions.y;
+                triProjected.t[1].x *= 0.5f * ScreenDimensions.x;
+                triProjected.t[1].y *= 0.5f * ScreenDimensions.y;
+                triProjected.t[2].x *= 0.5f * ScreenDimensions.x;
+                triProjected.t[2].y *= 0.5f * ScreenDimensions.y;
+
+                // Store triangle for sorting
+                vecTrianglesToRaster.push_back(triProjected);
+            }
+        }
+
+        //Sort triangles from back to front
+        std::sort(vecTrianglesToRaster.begin(), vecTrianglesToRaster.end(), [](Triangle& t1, Triangle& t2)
+            {
+                float z1 = (t1.t[0].z + t1.t[1].z + t1.t[2].z) / 3.0f;
+                float z2 = (t2.t[0].z + t2.t[1].z + t2.t[2].z) / 3.0f;
+                return z1 > z2;
+            });
+
+        sf::Color greyishColor = sf::Color(32, 128, 128);  // RGB values for a mid-grey color
+
+        // Draw Triangles
+        for (auto& triProjected : vecTrianglesToRaster)
         {
             sf::VertexArray vertexArray(sf::Triangles, 3);
 
-            fTheta += .01f * 0.0003f;
-            // Rotation Z
-            matRotZ.m[0][0] = cosf(fTheta);
-            matRotZ.m[0][1] = sinf(fTheta);
-            matRotZ.m[1][0] = -sinf(fTheta);
-            matRotZ.m[1][1] = cosf(fTheta);
-            matRotZ.m[2][2] = 1;
-            matRotZ.m[3][3] = 1;
-
-            // Rotation X
-            matRotX.m[0][0] = 1;
-            matRotX.m[1][1] = cosf(fTheta * 0.5f);
-            matRotX.m[1][2] = sinf(fTheta * 0.5f);
-            matRotX.m[2][1] = -sinf(fTheta * 0.5f);
-            matRotX.m[2][2] = cosf(fTheta * 0.5f);
-            matRotX.m[3][3] = 1;
-
-            triangle triProjected, triTranslated, triRotatedZ, triRotatedZX;
-
-            // Rotate in Z-Axis
-            MultiplyMatrixVector(tri.t[0], triRotatedZ.t[0], matRotZ);
-            MultiplyMatrixVector(tri.t[1], triRotatedZ.t[1], matRotZ);
-            MultiplyMatrixVector(tri.t[2], triRotatedZ.t[2], matRotZ);
-
-            // Rotate in X-Axis
-            MultiplyMatrixVector(triRotatedZ.t[0], triRotatedZX.t[0], matRotX);
-            MultiplyMatrixVector(triRotatedZ.t[1], triRotatedZX.t[1], matRotX);
-            MultiplyMatrixVector(triRotatedZ.t[2], triRotatedZX.t[2], matRotX);
-
-            // Offset into the screen
-            triTranslated = triRotatedZX;
-            triTranslated.t[0].z = triRotatedZX.t[0].z - 30.0f;
-            triTranslated.t[1].z = triRotatedZX.t[1].z - 30.0f;
-            triTranslated.t[2].z = triRotatedZX.t[2].z - 30.0f;
-            
-            // Project triangles from 3D --> 2D
-            MultiplyMatrixVector(triTranslated.t[0], triProjected.t[0], matProj);
-            MultiplyMatrixVector(triTranslated.t[1], triProjected.t[1], matProj);
-            MultiplyMatrixVector(triTranslated.t[2], triProjected.t[2], matProj);
-
-            // Scale into view
-            triProjected.t[0].x += 1.0f;
-            triProjected.t[0].y += 1.0f;
-
-            triProjected.t[1].x += 1.0f;
-            triProjected.t[1].y += 1.0f;
-
-            triProjected.t[2].x += 1.0f;
-            triProjected.t[2].y += 1.0f;
-
-            triProjected.t[0].x *= 0.5f * ScreenDimensions.x;
-            triProjected.t[0].y *= 0.5f * ScreenDimensions.y;
-
-            triProjected.t[1].x *= 0.5f * ScreenDimensions.x;
-            triProjected.t[1].y *= 0.5f * ScreenDimensions.y;
-
-            triProjected.t[2].x *= 0.5f * ScreenDimensions.x;
-            triProjected.t[2].y *= 0.5f * ScreenDimensions.y;
-
-            vertexArray[0].position = sf::Vector2f(triProjected.t[0].x, triProjected.t[0].y);
-            vertexArray[0].color = sf::Color::Red;
-
-            vertexArray[1].position = sf::Vector2f(triProjected.t[1].x, triProjected.t[1].y);
-            vertexArray[1].color = sf::Color::Green;
-
-            vertexArray[2].position = sf::Vector2f(triProjected.t[2].x, triProjected.t[2].y);
-            vertexArray[2].color = sf::Color::Blue;
+            for (int i = 0; i < 3; i++)
+            {
+                vertexArray[i].position = sf::Vector2f(triProjected.t[i].x, triProjected.t[i].y);
+                if (i % 2 == 0)
+                    vertexArray[i].color = sf::Color::White;
+                else
+                    vertexArray[i].color = greyishColor;
+            }
 
             window.draw(vertexArray);
         }
 
         window.display();
     }
-
     return 0;
 }
 
-void MultiplyMatrixVector(sf::Vector3f& i, sf::Vector3f& o, mat4x4& m)
+// Function to get shading color based on dot product
+sf::Color getColor(float& dp)
 {
-    o.x = i.x * m.m[0][0] + i.y * m.m[1][0] + i.z * m.m[2][0] + m.m[3][0];
-    o.y = i.x * m.m[0][1] + i.y * m.m[1][1] + i.z * m.m[2][1] + m.m[3][1];
-    o.z = i.x * m.m[0][2] + i.y * m.m[1][2] + i.z * m.m[2][2] + m.m[3][2];
-    float w = i.x * m.m[0][3] + i.y * m.m[1][3] + i.z * m.m[2][3] + m.m[3][3];
-
-    if (w != 0.0f)
-    {
-        o.x /= w;
-        o.y /= w;
-        o.z /= w;
-    }
-}
-
-sf::Color getRandomColor() {
-    return sf::Color(rand() % 256, rand() % 256, rand() % 256);
+    // Example: Darker color for surfaces facing away from the light
+    int shadeValue = static_cast<int>(255.0f * std::max(0.0f, dp));
+    return sf::Color(shadeValue, shadeValue, shadeValue);
 }
