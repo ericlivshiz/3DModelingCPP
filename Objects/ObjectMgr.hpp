@@ -9,11 +9,22 @@ struct vec3D {
     float x = 0;
     float y = 0;
     float z = 0;
-    float w = 2; // Need a 4th term for matrix vector multiplication
+    float w = 1; // Need a 4th term for matrix vector multiplication
 };
 
 struct Triangle {
     vec3D t[3];
+
+    sf::Color triColor;
+
+    void setColor(sf::Color& c)
+    {
+        triColor = c;
+    }
+
+    sf::Color getColor() {
+        return triColor;
+    }
 };
 
 struct Mesh {
@@ -60,5 +71,130 @@ struct Mesh {
         }
 
         return true;
+    }
+};
+
+
+class ObjectMgr {
+public:
+    void handleTriangles(sf::VertexArray& vertex, Triangle& triProjected)
+    {
+        sf::Color black = sf::Color::Black;
+
+        // Draw Triangles
+        for (int i = 0; i < 3; i++)
+        {
+            vertex[i].position = sf::Vector2f(triProjected.t[i].x, triProjected.t[i].y);
+            vertex[i].color = black;
+        }
+        
+    }
+
+    void handleWireFrame(sf::VertexArray& vertex, Triangle& triProjected)
+    {
+        // Draw Wireframes
+        sf::Color wireframeColor = sf::Color::White;
+
+        for (int i = 0; i < 3; i++)
+        {
+            int nextIndex = (i + 1) % 3;
+            vertex[i * 2].position = sf::Vector2f(triProjected.t[i].x, triProjected.t[i].y);
+            vertex[i * 2 + 1].position = sf::Vector2f(triProjected.t[nextIndex].x, triProjected.t[nextIndex].y);
+
+            vertex[i * 2].color = wireframeColor;
+            vertex[i * 2 + 1].color = wireframeColor;
+        }
+        
+    }
+
+    void createCubeMesh(Mesh& m)
+    {
+        m.tris = {
+             // SOUTH
+            {vec3D{0.0f, 0.0f, 0.0f},     vec3D{0.0f, 1.0f, 0.0f},     vec3D{1.0f, 1.0f, 0.0f}},
+            {vec3D{0.0f, 0.0f, 0.0f},     vec3D{1.0f, 1.0f, 0.0f},     vec3D{1.0f, 0.0f, 0.0f}},
+
+             // EAST
+            {vec3D{1.0f, 0.0f, 0.0f},     vec3D{1.0f, 1.0f, 0.0f},     vec3D{1.0f, 1.0f, 1.0f}},
+            {vec3D{1.0f, 0.0f, 0.0f},     vec3D{1.0f, 1.0f, 1.0f},     vec3D{1.0f, 0.0f, 1.0f}},
+
+             // NORTH
+            {vec3D{1.0f, 0.0f, 1.0f},     vec3D{1.0f, 1.0f, 1.0f},     vec3D{0.0f, 1.0f, 1.0f}},
+            {vec3D{1.0f, 0.0f, 1.0f},     vec3D{0.0f, 1.0f, 1.0f},     vec3D{0.0f, 0.0f, 1.0f}},
+
+             //// WEST
+            {vec3D{0.0f, 0.0f, 1.0f},     vec3D{0.0f, 1.0f, 1.0f},     vec3D{0.0f, 1.0f, 0.0f}},
+            {vec3D{0.0f, 0.0f, 1.0f},     vec3D{0.0f, 1.0f, 0.0f},     vec3D{0.0f, 0.0f, 0.0f}},
+
+             //// TOP
+            {vec3D{0.0f, 1.0f, 0.0f},     vec3D{0.0f, 1.0f, 1.0f},     vec3D{1.0f, 1.0f, 1.0f}},
+            {vec3D{0.0f, 1.0f, 0.0f},     vec3D{1.0f, 1.0f, 1.0f},     vec3D{1.0f, 1.0f, 0.0f}},
+
+             //// BOTTOM
+            {vec3D{1.0f, 0.0f, 1.0f},     vec3D{0.0f, 0.0f, 1.0f},     vec3D{0.0f, 0.0f, 0.0f}},
+            {vec3D{1.0f, 0.0f, 1.0f},     vec3D{0.0f, 0.0f, 0.0f},     vec3D{1.0f, 0.0f, 0.0f}},
+
+
+        };
+    }
+
+    void createPlaneMesh(Mesh& m)
+    {
+        m.tris = {
+            // SOUTH
+            {vec3D{0.0f, 0.0f, 0.0f},     vec3D{0.0f, 0.1f, 0.0f},     vec3D{1.0f, 0.1f, 0.0f}},
+            {vec3D{0.0f, 0.0f, 0.0f},     vec3D{1.0f, 0.1f, 0.0f},     vec3D{1.0f, 0.0f, 0.0f}},
+
+            // EAST
+            {vec3D{1.0f, 0.0f, 0.0f},     vec3D{1.0f, 0.1f, 0.0f},     vec3D{1.0f, 0.1f, 1.0f}},
+            {vec3D{1.0f, 0.0f, 0.0f},     vec3D{1.0f, 0.1f, 1.0f},     vec3D{1.0f, 0.0f, 1.0f}},
+
+            // NORTH
+            {vec3D{1.0f, 0.0f, 1.0f},     vec3D{1.0f, 0.1f, 1.0f},     vec3D{0.0f, 0.1f, 1.0f}},
+            {vec3D{1.0f, 0.0f, 1.0f},     vec3D{0.0f, 0.1f, 1.0f},     vec3D{0.0f, 0.0f, 1.0f}},
+
+            //// WEST
+            {vec3D{0.0f, 0.0f, 1.0f},     vec3D{0.0f, 0.1f, 1.0f},     vec3D{0.0f, 0.1f, 0.0f}},
+            {vec3D{0.0f, 0.0f, 1.0f},     vec3D{0.0f, 0.1f, 0.0f},     vec3D{0.0f, 0.0f, 0.0f}},
+
+              //// TOP
+            {vec3D{0.0f, 0.1f, 0.0f},     vec3D{0.0f, 0.1f, 1.0f},     vec3D{1.0f, 0.1f, 1.0f}},
+            {vec3D{0.0f, 0.1f, 0.0f},     vec3D{1.0f, 0.1f, 1.0f},     vec3D{1.0f, 0.1f, 0.0f}},
+
+             //// BOTTOM
+            {vec3D{1.0f, 0.0f, 1.0f},     vec3D{0.0f, 0.0f, 1.0f},     vec3D{0.0f, 0.0f, 0.0f}},
+            {vec3D{1.0f, 0.0f, 1.0f},     vec3D{0.0f, 0.0f, 0.0f},     vec3D{1.0f, 0.0f, 0.0f}},
+
+        };
+    }
+
+    void createPyramidMesh(Mesh& m)
+    {
+        m.tris = {
+            // SOUTH
+            {vec3D{0.0f, 0.0f, 0.0f},     vec3D{0.5f, 1.f, 0.0f},     vec3D{1.0f, 0.0f, 0.0f}},
+            {vec3D{0.0f, 0.0f, 0.0f},     vec3D{1.0f, 0.1f, 0.0f},     vec3D{1.0f, 0.0f, 0.0f}},
+
+            // EAST
+            //{vec3D{1.0f, 0.0f, 0.0f},     vec3D{1.0f, 0.5f, 0.5f},     vec3D{1.0f, 0.1f, 1.0f}},
+            //{vec3D{1.0f, 0.0f, 0.0f},     vec3D{1.0f, 0.1f, 1.0f},     vec3D{1.0f, 0.0f, 1.0f}},
+
+            //// NORTH
+            //{vec3D{1.0f, 0.0f, 1.0f},     vec3D{1.0f, 0.1f, 1.0f},     vec3D{0.0f, 0.1f, 1.0f}},
+            //{vec3D{1.0f, 0.0f, 1.0f},     vec3D{0.0f, 0.1f, 1.0f},     vec3D{0.0f, 0.0f, 1.0f}},
+
+            ////// WEST
+            //{vec3D{0.0f, 0.0f, 1.0f},     vec3D{0.0f, 0.1f, 1.0f},     vec3D{0.0f, 0.1f, 0.0f}},
+            //{vec3D{0.0f, 0.0f, 1.0f},     vec3D{0.0f, 0.1f, 0.0f},     vec3D{0.0f, 0.0f, 0.0f}},
+
+            ////// TOP
+            //{vec3D{0.0f, 0.1f, 0.0f},     vec3D{0.0f, 0.1f, 1.0f},     vec3D{1.0f, 0.1f, 1.0f}},
+            //{vec3D{0.0f, 0.1f, 0.0f},     vec3D{1.0f, 0.1f, 1.0f},     vec3D{1.0f, 0.1f, 0.0f}},
+
+            ////// BOTTOM
+            //{vec3D{1.0f, 0.0f, 1.0f},     vec3D{0.0f, 0.0f, 1.0f},     vec3D{0.0f, 0.0f, 0.0f}},
+            //{vec3D{1.0f, 0.0f, 1.0f},     vec3D{0.0f, 0.0f, 0.0f},     vec3D{1.0f, 0.0f, 0.0f}},
+
+        };
     }
 };

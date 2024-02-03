@@ -1,5 +1,8 @@
 #include "../Objects/ObjectMgr.hpp"
 #include "../Util/Math.hpp"
+#include <iostream>
+#include <algorithm>
+#include <list>
 
 void populateMesh(Mesh& mesh);
 
@@ -14,8 +17,10 @@ int main()
     Mesh mesh;
     mat4x4 matProj;
     Math math;
+    ObjectMgr objMgr;
 
-    mesh.loadFromObjFile("Objects/axis.obj");
+    mesh.loadFromObjFile("Objects/mountains.obj");
+    //objMgr.createPyramidMesh(mesh);
 
     // Projection Matrix
     matProj = math.Matrix_MakeProjection(90.0f, (float)ScreenDimensions.y / (float)ScreenDimensions.x, 0.1f, 1000.0f);
@@ -28,9 +33,9 @@ int main()
     vec3D vCamera;
     vec3D vLookDir;
 
-
     float fYaw = 0;
 
+    bool drawWireFrames = false;
 
     while (window.isOpen())
     {
@@ -45,33 +50,32 @@ int main()
 
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up))
             {
-                vCamera.y += 0.2f;
+                vCamera.y += 0.1f;
             }
 
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down))
             {
-                vCamera.y -= 0.2f;
+                vCamera.y -= 0.1f;
             }
 
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right))
             {
-                fYaw += 0.1f;
-
+                fYaw += 0.03f;
             }
 
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left))
             {
-                fYaw -= 0.1f;
+                fYaw -= 0.03f;
             }
 
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::D))
             {
-                vCamera.x -= 0.2f;
+                vCamera.x -= 0.1f;
             }
             
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::A))
             {
-                vCamera.x += 0.2f;
+                vCamera.x += 0.1f;
             }
 
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::W))
@@ -83,9 +87,20 @@ int main()
             {
                 vCamera = math.Vector_Sub(vCamera, vForward);
             }
+
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::P))
+            {
+                drawWireFrames = true;
+            }
+
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::O))
+            {
+                drawWireFrames = false;
+            }
         }
 
-        window.clear();
+        const sf::Color CLEAR_COLOR(81,94,60);
+        window.clear(CLEAR_COLOR);
 
         vec3D vUp = { 0, 1, 0 };
         vec3D vTarget = { 0,0,1 };
@@ -156,7 +171,7 @@ int main()
                 int nClippedTriangles = 0;
                 Triangle clipped[2];
                 nClippedTriangles = math.Triangle_ClipAgainstPlane(
-                    { 0.0f, 0.0f, 0.1f }, { 0.0f, 0.0f, 1.0f }, triViewed, clipped[0], clipped[1]);
+                    { 0.0f, 0.0f, 0.1f }, { 0.0f, 0.0f, 1.f }, triViewed, clipped[0], clipped[1]);
 
                 for (int n = 0; n < nClippedTriangles; n++)
                 {
@@ -183,12 +198,12 @@ int main()
                     triProjected.t[0] = math.Vector_Add(triProjected.t[0], vOffsetView);
                     triProjected.t[1] = math.Vector_Add(triProjected.t[1], vOffsetView);
                     triProjected.t[2] = math.Vector_Add(triProjected.t[2], vOffsetView);
-                    triProjected.t[0].x *= 0.5f * ScreenDimensions.x;
-                    triProjected.t[0].y *= 0.5f * ScreenDimensions.y;
-                    triProjected.t[1].x *= 0.5f * ScreenDimensions.x;
-                    triProjected.t[1].y *= 0.5f * ScreenDimensions.y;
-                    triProjected.t[2].x *= 0.5f * ScreenDimensions.x;
-                    triProjected.t[2].y *= 0.5f * ScreenDimensions.y;
+                    triProjected.t[0].x *= 0.5f * (float)ScreenDimensions.x;
+                    triProjected.t[0].y *= 0.5f * (float)ScreenDimensions.y;
+                    triProjected.t[1].x *= 0.5f * (float)ScreenDimensions.x;
+                    triProjected.t[1].y *= 0.5f * (float)ScreenDimensions.y;
+                    triProjected.t[2].x *= 0.5f * (float)ScreenDimensions.x;
+                    triProjected.t[2].y *= 0.5f * (float)ScreenDimensions.y;
 
                     // Store triangle for sorting
                     vecTrianglesToRaster.push_back(triProjected);
@@ -202,31 +217,32 @@ int main()
                 float z1 = (t1.t[0].z + t1.t[1].z + t1.t[2].z) / 3.0f;
                 float z2 = (t2.t[0].z + t2.t[1].z + t2.t[2].z) / 3.0f;
                 return z1 > z2;
-            });
+            });        
 
-        sf::Color greyishColor = sf::Color(128, 128, 128);  // RGB values for a mid-grey color
 
-        // Draw Triangles
+
+        // Draw Triangles Projections
         for (auto& triProjected : vecTrianglesToRaster)
         {
-            sf::VertexArray vertexArray(sf::Triangles, 3);
+            sf::VertexArray triVertex(sf::Triangles, 3);
+            sf::VertexArray lineVertex(sf::Lines, 6); // 3 lines for the triangle
 
-            for (int i = 0; i < 3; i++)
+            objMgr.handleTriangles(triVertex, triProjected);
+            window.draw(triVertex);
+
+            if (drawWireFrames)
             {
-                vertexArray[i].position = sf::Vector2f(triProjected.t[i].x, triProjected.t[i].y);
-                if (i % 2 == 0)
-                    vertexArray[i].color = sf::Color::White;
-                else
-                    vertexArray[i].color = greyishColor;
+                objMgr.handleWireFrame(lineVertex, triProjected);
+                window.draw(lineVertex);
             }
-
-            window.draw(vertexArray);
+                
         }
 
         window.display();
     }
     return 0;
 }
+
 
 // Function to get shading color based on dot product
 sf::Color getColor(float& dp)
@@ -235,3 +251,61 @@ sf::Color getColor(float& dp)
     int shadeValue = static_cast<int>(255.0f * std::max(0.0f, dp));
     return sf::Color(shadeValue, shadeValue, shadeValue);
 }
+
+
+
+
+
+
+// I couldn't figure this out but you could also draw like this
+//for (int p = 0; p < 4; p++)
+//{
+//    int nTrisToAdd = 0;
+//    while (nNewTriangles > 0)
+//    {
+//        // Take triangle from front of queue
+//        Triangle test = listTriangles.front();
+//        listTriangles.pop_front();
+//        nNewTriangles--;
+//
+//        // Clip it against a plane. We only need to test each 
+//        // subsequent plane, against subsequent new triangles
+//        // as all triangles after a plane clip are guaranteed
+//        // to lie on the inside of the plane. I like how this
+//        // comment is almost completely and utterly justified
+//        switch (p)
+//        {
+//        case 0:	nTrisToAdd = math.Triangle_ClipAgainstPlane({ 0.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, test, clipped[0], clipped[1]); break;
+//        case 1:	nTrisToAdd = math.Triangle_ClipAgainstPlane({ 0.0f, (float)ScreenDimensions.y - 1, 0.0f }, { 0.0f, -1.0f, 0.0f }, test, clipped[0], clipped[1]); break;
+//        case 2:	nTrisToAdd = math.Triangle_ClipAgainstPlane({ 0.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f }, test, clipped[0], clipped[1]); break;
+//        case 3:	nTrisToAdd = math.Triangle_ClipAgainstPlane({ (float)ScreenDimensions.x - 1, 0.0f, 0.0f }, { -1.0f, 0.0f, 0.0f }, test, clipped[0], clipped[1]); break;
+//        }
+//
+//        // Clipping may yield a variable number of triangles, so
+//        // add these new ones to the back of the queue for subsequent
+//        // clipping against next planes
+//        for (int w = 0; w < nTrisToAdd; w++)
+//            listTriangles.push_back(clipped[w]);
+//    }
+//    nNewTriangles = listTriangles.size();
+//}
+//
+//// Draw Triangles
+//for (auto& triProjected : listTriangles)
+//{
+//    sf::VertexArray vertexArray(sf::Triangles, 3);
+//
+//    for (int i = 0; i < 3; i++)
+//    {
+//        vertexArray[i].position = sf::Vector2f(triProjected.t[i].x, triProjected.t[i].y);
+//        if (i % 2 == 0)
+//            vertexArray[i].color = sf::Color::White;
+//        else
+//            vertexArray[i].color = greyishColor;
+//    }
+//
+//    window.draw(vertexArray);
+//}
+//
+//window.display();
+//        }
